@@ -125,25 +125,19 @@ async def run_bot_once():
         except Exception as e:
             LOGGER.exception("Error while stopping client: %s", e)
         LOGGER.info("Client stopped.")
-        async def main_loop():
-    # continuous restart loop
-    while True:
+       async def main():
+    await PRO.start()
+    bot_info = await PRO.get_me()
+    LOGGER.info(f"<--- @{bot_info.username} Started --->")
+
+    for i in chat_id:
         try:
-            LOGGER.info("Starting bot instance...")
-            await run_bot_once()
-        except Exception as e:
-            LOGGER.exception("Unhandled exception in run_bot_once(): %s", e)
-        LOGGER.info("Bot will restart in 2 seconds...")
-        await asyncio.sleep(2)
+            await PRO.send_message(chat_id=i, text="Bot Started! ♾ /pro ")
+        except Exception as d:
+            print(d)
+            continue  # यह भी indent रहना चाहिए
 
+    await idle()
 
-if name == "main":
-    # sanity checks for required config
-    if not Config.BOT_TOKEN:
-        LOGGER.error("BOT_TOKEN is empty. Set BOT_TOKEN environment variable.")
-        raise SystemExit(1)
-    if not Config.API_ID or not Config.API_HASH:
-        LOGGER.error("API_ID/API_HASH missing. Set API_ID and API_HASH environment variables.")
-        raise SystemExit(1)
-
-    asyncio.run(main_loop())
+asyncio.get_event_loop().run_until_complete(main())
+LOGGER.info(f"<---Bot Stopped--->")
