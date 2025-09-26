@@ -1,24 +1,25 @@
+# Base image
 FROM python:3.9.7-slim-bullseye
-WORKDIR .
+
+# Workdir container के अंदर /app
+WORKDIR /app
+
+# Project files container में copy
 COPY . .
 
-RUN apt-get update
-RUN apt-get update -y
-RUN apt-get install -y build-essential
-RUN apt -y install curl
-RUN apt-get -y install git
-RUN git clone https://github.com/axiomatic-systems/Bento4.git && \
-cd Bento4 &&\
-apt-get -y install cmake && \
-mkdir cmakebuild && \ 
-cd cmakebuild/ && \
-cmake -DCMAKE_BUILD_TYPE=Release .. &&\
-make &&\ 
-make install
-RUN apt-get install -y aria2
-RUN apt -qq update && apt -qq install -y git wget pv jq python3-dev ffmpeg mediainfo
-RUN apt install ffmpeg
-RUN pip3 install -r requirements.txt
-CMD ["sh", "start.sh"]
+# Dependencies install + Bento4 build
+RUN apt-get update -y && \
+    apt-get install -y build-essential curl git cmake aria2 wget pv jq python3-dev ffmpeg mediainfo && \
+    git clone https://github.com/axiomatic-systems/Bento4.git && \
+    cd Bento4 && \
+    mkdir cmakebuild && \
+    cd cmakebuild && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make && \
+    make install
 
-#!git clone https://github.com/axiomatic-systems/Bento4.git && cd Bento4 && apt-get -y install cmake && mkdir cmakebuild && cd cmakebuild/ && cmake -DCMAKE_BUILD_TYPE=Release .. && make && make install
+# Python requirements install
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Container start होने पर ये script चलेगा
+CMD ["sh", "start.sh"]
