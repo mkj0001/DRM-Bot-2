@@ -2,15 +2,14 @@ import os
 import asyncio
 import logging
 import tgcrypto
-
-from pyrogram import Client as AFK, idle
+from pyrogram import Client as AFK, idle, errors
 from pyrogram.enums import ChatMemberStatus, ChatMembersFilter
 from pyrogram import enums
 from pyrogram.types import ChatMember
 from pyromod import listen
 from tglogging import TelegramLogHandler
 
-# ───── Config ─────
+# Config
 class Config(object):
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "8496276598:AAFzxd8pBJcpEAWvR0Itow8p_xYBi2iZwDw")
     API_ID = int(os.environ.get("API_ID", "17640565"))
@@ -18,17 +17,11 @@ class Config(object):
     DOWNLOAD_LOCATION = "./DOWNLOADS"
     SESSIONS = "./SESSIONS"
 
-    AUTH_USERS = os.environ.get('AUTH_USERS', '7959404410').split(',')
-    for i in range(len(AUTH_USERS)):
-        AUTH_USERS[i] = int(AUTH_USERS[i])
-
-    GROUPS = os.environ.get('GROUPS', '-1002806996269').split(',')
-    for i in range(len(GROUPS)):
-        GROUPS[i] = int(GROUPS[i])
-
+    AUTH_USERS = [int(x) for x in os.environ.get('AUTH_USERS', '7959404410').split(',')]
+    GROUPS = [int(x) for x in os.environ.get('GROUPS', '-1002806996269').split(',')]
     LOG_CH = os.environ.get("LOG_CH", "-1003166167318")
 
-# ───── Logger ─────
+# Logging
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s - %(levelname)s] - %(name)s - %(message)s",
@@ -39,39 +32,17 @@ logging.basicConfig(
             log_chat_id=Config.LOG_CH,
             update_interval=2,
             minimum_lines=1,
-            pending_logs=200000
-        ),
+            pending_logs=200000),
         logging.StreamHandler()
     ]
 )
+LOGGER = logging.getLogger(name)
+LOGGER.info("live log streaming to telegram.")
 
-LOGGER = logging.getLogger(name)  # ← यहां सही किया
-LOGGER.info("Live log streaming to telegram.")
-
-# ───── Store ─────
-class Store(object):
-    CPTOKEN = "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9..."
-    SPROUT_URL = "https://discuss.oliveboard.in/"
-    ADDA_TOKEN = ""
-    THUMB_URL = "https://telegra.ph/file/84870d6d89b893e59c5f0.jpg"
-
-# ───── Format ─────
-class Msg(object):
-    START_MSG = "/pro"
-    TXT_MSG = "Hey <b>{user},\n\nI'm Multi-Talented Robot. I Can Download Many Type of Links.\n\nSend a TXT or HTML file :-</b>"
-    ERROR_MSG = "<b>DL Failed ({no_of_files}) :-</b>\n\n<b>Name: </b>{file_name},\n<b>Link:</b> {file_link}\n\n<b>Error:</b> {error}"
-    SHOW_MSG = "<b>Downloading :- \n{file_name}\n\nLink :- {file_link}</b>"
-    CMD_MSG_1 = "{txt}\n\nTotal Links in File are :- {no_of_links}\n\nSend any Index From [ 1 - {no_of_links} ] :-"
-    CMD_MSG_2 = "<b>Uploading :- </b> {file_name}"
-    RESTART_MSG = "✅ HI Bhai log\n✅ PATH CLEARED"
-
-# ───── Prefixes ─────
-prefixes = ["/", "~", "?", "!", "."]
-
-# ───── Client ─────
+# Client
 plugins = dict(root="plugins")
 
-if name == "main":
+async def start_bot():
     if not os.path.isdir(Config.DOWNLOAD_LOCATION):
         os.makedirs(Config.DOWNLOAD_LOCATION)
     if not os.path.isdir(Config.SESSIONS):
@@ -88,30 +59,35 @@ if name == "main":
         workers=2,
     )
 
-    chat_id = []
-    for i, j in zip(Config.GROUPS, Config.AUTH_USERS):
-        chat_id.append(i)
-        chat_id.append(j)
+    chat_id = Config.GROUPS + Config.AUTH_USERS
 
-    async def main():
+    try:
         await PRO.start()
         bot_info = await PRO.get_me()
         LOGGER.info(f"<--- @{bot_info.username} Started --->")
 
         for i in chat_id:
             try:
-                await PRO.send_message(chat_id=i, text="Bot Started! ♾ /pro ")
+                await PRO.send_message(chat_id=i, text="✅ Bot Started! ♾ /pro")
+                await asyncio.sleep(0.5)  # to avoid flood
+            except errors.FloodWait as e:
+                LOGGER.warning(f"Flood wait for {e.value} seconds")
+                await asyncio.sleep(e.value)
             except Exception as d:
-                LOGGER.warning(f"Cannot send start message to {i} => {d}")
+                LOGGER.error(d)
                 continue
 
-        # Idle loop so that ping/net task not stop
         await idle()
 
-    # रन करते समय crash न हो इसलिए error trap:
-    try:
-        asyncio.get_event_loop().run_until_complete(main())
     except Exception as e:
-        LOGGER.error(f"Main loop error: {e}")
+        LOGGER.error(f"Error in main: {e}")
+    finally:
+        await PRO.stop()
+        LOGGER.info("Bot stopped")
 
-    LOGGER.info(f"<--- Bot Stopped --->")
+# Auto-Restart loop
+if name == "main":
+    while True:
+        asyncio.run(start_bot())
+        LOGGER.info("Restarting bot in 2 seconds…")
+        asyncio.sleep(2)
