@@ -1,143 +1,120 @@
 import os
+from pyrogram import Client as AFK, idle
+from pyrogram.enums import ChatMemberStatus, ChatMembersFilter
+from pyrogram import enums
+from pyrogram.types import ChatMember
 import asyncio
 import logging
-import time
 import tgcrypto
-from pyrogram import Client as AFK, idle, errors
 from pyromod import listen
+import logging
 from tglogging import TelegramLogHandler
 
-# -------- helpers ----------
-def parse_id_list(env_name: str, default: str):
-    s = os.environ.get(env_name, default or "")
-    if not s:
-        return []
-    parts = [p.strip() for p in s.split(',') if p.strip()]
-    ids = []
-    for p in parts:
-        try:
-            ids.append(int(p))
-        except ValueError:
-            logging.warning("Invalid id in %s: %r (skipping)", env_name, p)
-    return ids
-
-def parse_single_id(env_name: str, default: str):
-    v = os.environ.get(env_name, default)
-    if not v:
-        return None
-    try:
-        return int(v)
-    except Exception:
-        logging.warning("Invalid single id for %s: %r", env_name, v)
-        return None
-
-# -------- Config ----------
+# Config 
 class Config(object):
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-    API_ID = int(os.environ.get("API_ID", "0") or 0)
-    API_HASH = os.environ.get("API_HASH", "")
-    DOWNLOAD_LOCATION = os.environ.get("DOWNLOAD_LOCATION", "./DOWNLOADS")
-    SESSIONS = os.environ.get("SESSIONS", "./SESSIONS")
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "8496276598:AAFzxd8pBJcpEAWvR0Itow8p_xYBi2iZwDw")
+    API_ID = int(os.environ.get("API_ID",  "17640565"))
+    API_HASH = os.environ.get("API_HASH", "ff67816c19a48aff1f86204ff61ce786")
+    DOWNLOAD_LOCATION = "./DOWNLOADS"
+    SESSIONS = "./SESSIONS"
 
-    AUTH_USERS = parse_id_list('AUTH_USERS', '7959404410')
-    GROUPS = parse_id_list('GROUPS', '-1002806996269')
+    AUTH_USERS = os.environ.get('AUTH_USERS', '7959404410').split(',')
+    for i in range(len(AUTH_USERS)):
+        AUTH_USERS[i] = int(AUTH_USERS[i])
 
-    LOG_CH = parse_single_id("LOG_CH", "-1003166167318")
+    GROUPS = os.environ.get('GROUPS', '-1002806996269').split(',')
+    for i in range(len(GROUPS)):
+        GROUPS[i] = int(GROUPS[i])
 
-# -------- Logging ----------
-# try to use TelegramLogHandler but don't crash if it fails
-handlers = [logging.StreamHandler()]
-try:
-    if Config.BOT_TOKEN and Config.LOG_CH:
-        handlers.insert(0, TelegramLogHandler(
-            token=Config.BOT_TOKEN,
-            log_chat_id=Config.LOG_CH,
-            update_interval=2,
-            minimum_lines=1,
-            pending_logs=200000
-        ))
-except Exception as e:
-    print("TelegramLogHandler init failed:", e)
+    LOG_CH = os.environ.get("LOG_CH", "-1003166167318")
 
+# TelegramLogHandler is a custom handler which is inherited from an existing handler. ie, StreamHandler.
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s - %(levelname)s] - %(name)s - %(message)s",
     datefmt='%d-%b-%y %H:%M:%S',
-    handlers=handlers
+    handlers=[
+        TelegramLogHandler(
+            token=Config.BOT_TOKEN, 
+            log_chat_id= Config.LOG_CH, 
+            update_interval=2, 
+            minimum_lines=1, 
+            pending_logs=200000),
+        logging.StreamHandler()
+    ]
 )
 
 LOGGER = logging.getLogger(name)
-LOGGER.info("Logger initialized.")
+LOGGER.info("live log streaming to telegram.")
 
-# -------- Client plugins ----------
+
+# Store
+class Store(object):
+    CPTOKEN = "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0"
+    SPROUT_URL = "https://discuss.oliveboard.in/"
+    ADDA_TOKEN = ""
+    THUMB_URL = "https://telegra.ph/file/84870d6d89b893e59c5f0.jpg"
+
+# Format
+class Msg(object):
+    START_MSG = "/pro"
+
+    TXT_MSG = "Hey <b>{user},"\
+        "\n\nI'm Multi-Talented Robot. I Can Download Many Type of Links."\
+            "\n\nSend a TXT or HTML file :-</b>"
+
+    ERROR_MSG = "<b>DL Failed ({no_of_files}) :-</b> "\
+        "\n\n<b>Name: </b>{file_name},\n<b>Link:</b> {file_link}\n\n<b>Error:</b> {error}"
+
+    SHOW_MSG = "<b>Downloading :- "\
+        "\n{file_name}\n\nLink :- {file_link}</b>"
+
+    CMD_MSG_1 = "{txt}\n\nTotal Links in File are :- {no_of_links}\n\n**Send any Index From [ 1 - {no_of_links} ] :-**"
+    CMD_MSG_2 = "<b>Uploading :- </b> {file_name}"
+    RESTART_MSG = "✅ HI Bhai log\n✅ PATH CLEARED"
+
+# Prefixes
+prefixes = ["/", "~", "?", "!", "."]
+
+# Client
 plugins = dict(root="plugins")
+if name == "main":
+    if not os.path.isdir(Config.DOWNLOAD_LOCATION):
+        os.makedirs(Config.DOWNLOAD_LOCATION)
+    if not os.path.isdir(Config.SESSIONS):
+        os.makedirs(Config.SESSIONS)
 
-
-# -------- Core run logic ----------
-async def run_bot_once():
-    # ensure folders exist
-    os.makedirs(Config.DOWNLOAD_LOCATION, exist_ok=True)
-    os.makedirs(Config.SESSIONS, exist_ok=True)
-
-    # Build recipients list (groups first then auth users)
-    recipients = []
-    recipients.extend(Config.GROUPS)
-    recipients.extend(Config.AUTH_USERS)
-
-    # Create client
     PRO = AFK(
         "AFK-DL",
+        bot_token=Config.BOT_TOKEN,
         api_id=Config.API_ID,
         api_hash=Config.API_HASH,
-        bot_token=Config.BOT_TOKEN,
+        sleep_threshold=120,
         plugins=plugins,
-        workdir=f"{Config.SESSIONS}/",
-        workers=2,
+        workdir= f"{Config.SESSIONS}/",
+        workers= 2,
     )
 
-    try:
+    chat_id = []
+    for i, j in zip(Config.GROUPS, Config.AUTH_USERS):
+        chat_id.append(i)
+        chat_id.append(j)
+    
+    
+    async def main():
         await PRO.start()
-        me = await PRO.get_me()
-        LOGGER.info(f"<--- @{getattr(me, 'username', 'bot')} Started --->")
-
-        # send startup messages with flood handling
-        for cid in recipients:
+        # h = await PRO.get_chat_member(chat_id= int(-1002115046888), user_id=6695586027)
+        # print(h)
+        bot_info = await PRO.get_me()
+        LOGGER.info(f"<--- @{bot_info.username} Started --->")
+        
+        for i in chat_id:
             try:
-                await PRO.send_message(chat_id=cid, text="✅ Bot Started! ♾ /pro")
-                await asyncio.sleep(0.5)  # gentle delay to reduce flooding
-            except errors.FloodWait as e:
-                # many pyrogram versions store wait in e.value or e.x
-                wait = getattr(e, "value", None) or getattr(e, "x", None) or getattr(e, "wait", None)
-                wait = int(wait) if wait else 5
-                LOGGER.warning(f"FloodWait caught. Sleeping for {wait} seconds...")
-                await asyncio.sleep(wait)
-            except errors.MessageNotModified:
-                LOGGER.debug("Message not modified. Skipping update.")
-            except Exception as exc:
-                LOGGER.exception("Failed to send startup message to %s: %s", cid, exc)
-
-        # Idle until stopped
+                await PRO.send_message(chat_id=i, text="Bot Started! ♾ /pro ")
+            except Exception as d:
+                print(d)
+                continue
         await idle()
 
-    finally:
-        try:
-            await PRO.stop()
-        except Exception as e:
-            LOGGER.exception("Error while stopping client: %s", e)
-        LOGGER.info("Client stopped.")
-       async def main():
-    await PRO.start()
-    bot_info = await PRO.get_me()
-    LOGGER.info(f"<--- @{bot_info.username} Started --->")
-
-    for i in chat_id:
-        try:
-            await PRO.send_message(chat_id=i, text="Bot Started! ♾ /pro ")
-        except Exception as d:
-            print(d)
-            continue  # यह भी indent रहना चाहिए
-
-    await idle()
-
-asyncio.get_event_loop().run_until_complete(main())
-LOGGER.info(f"<---Bot Stopped--->")
+    asyncio.get_event_loop().run_until_complete(main())
+    LOGGER.info(f"<---Bot Stopped--->")
