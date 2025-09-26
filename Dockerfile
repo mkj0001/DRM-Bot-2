@@ -13,11 +13,14 @@ RUN adduser --disabled-password --gecos '' botuser
 # पहले से DOWNLOADS folder बना दो और permission दे दो
 RUN mkdir -p /app/DOWNLOADS && chown -R botuser:botuser /app
 
-USER botuser
-
-COPY --chown=botuser:botuser requirements.txt /app/
+# पहले requirements.txt कॉपी करके root user से install करो
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir --no-warn-script-location -r requirements.txt
 
+# फिर बाकी कोड कॉपी करो और ownership botuser को दो
 COPY --chown=botuser:botuser . /app/
+
+# अब non-root user पर switch करो
+USER botuser
 
 CMD ["python3", "main.py"]
