@@ -1,25 +1,27 @@
-# Base image
 FROM python:3.9.7-slim-bullseye
 
-# Workdir container के अंदर /app
+# Workdir
 WORKDIR /app
 
-# Project files container में copy
+# Copy all project files into the image
 COPY . .
 
-# Dependencies install + Bento4 build
-RUN apt-get update -y && \
-    apt-get install -y build-essential curl git cmake aria2 wget pv jq python3-dev ffmpeg mediainfo && \
-    git clone https://github.com/axiomatic-systems/Bento4.git && \
-    cd Bento4 && \
-    mkdir cmakebuild && \
-    cd cmakebuild && \
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential curl git cmake aria2 wget pv jq python3-dev ffmpeg mediainfo \
+ && rm -rf /var/lib/apt/lists/*
+
+# Build Bento4
+RUN git clone https://github.com/axiomatic-systems/Bento4.git /tmp/Bento4 && \
+    mkdir /tmp/Bento4/cmakebuild && \
+    cd /tmp/Bento4/cmakebuild && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
-    make && \
-    make install
+    make && make install && \
+    rm -rf /tmp/Bento4
 
-# Python requirements install
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Python dependencies
+RUN pip install --upgrade pip \
+ && pip install -r requirements.txt
 
-# Container start होने पर ये script चलेगा
-CMD ["sh", "start.sh"]
+# Entrypoint – run your handlers/tg.py file
+CMD ["python3","-u","handlers/tg.py"]
