@@ -1,26 +1,22 @@
-FROM python:3.10-slim
+FROM python:3.9.7-slim-buster
+WORKDIR .
+COPY . .
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app \
-    DOWNLOAD_LOCATION=/app/DOWNLOADS
-
-WORKDIR /app
-
-# नया user बनाएँ
-RUN adduser --disabled-password --gecos '' botuser
-
-# पहले से DOWNLOADS folder बना दो और permission दे दो
-RUN mkdir -p /app/DOWNLOADS && chown -R botuser:botuser /app
-
-# पहले requirements.txt कॉपी करके root user से install करो
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir --no-warn-script-location -r requirements.txt
-
-# फिर बाकी कोड कॉपी करो और ownership botuser को दो
-COPY --chown=botuser:botuser . /app/
-
-# अब non-root user पर switch करो
-USER botuser
-
-CMD ["python3", "main.py"]
+RUN apt-get update
+RUN apt-get update -y
+RUN apt-get install -y build-essential
+RUN apt -y install curl
+RUN apt-get -y install git
+RUN git clone https://github.com/axiomatic-systems/Bento4.git && \
+cd Bento4 &&\
+apt-get -y install cmake && \
+mkdir cmakebuild && \ 
+cd cmakebuild/ && \
+cmake -DCMAKE_BUILD_TYPE=Release .. &&\
+make &&\ 
+make install
+RUN apt-get install -y aria2
+RUN apt -qq update && apt -qq install -y git wget pv jq python3-dev ffmpeg mediainfo
+RUN apt install ffmpeg
+RUN pip3 install -r requirements.txt
+CMD ["sh", "start.sh"]
