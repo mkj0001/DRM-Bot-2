@@ -1,27 +1,20 @@
-FROM python:3.9.7-slim-bullseye
+# 1. Lightweight Python base image
+FROM python:3.10-slim
 
-# Workdir
+# 2. Set working directory inside container
 WORKDIR /app
 
-# Copy all project files into the image
-COPY . .
+# 3. Copy all project files into container
+COPY . /app
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential curl git cmake aria2 wget pv jq python3-dev ffmpeg mediainfo \
- && rm -rf /var/lib/apt/lists/*
+# 4. Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Build Bento4
-RUN git clone https://github.com/axiomatic-systems/Bento4.git /tmp/Bento4 && \
-    mkdir /tmp/Bento4/cmakebuild && \
-    cd /tmp/Bento4/cmakebuild && \
-    cmake -DCMAKE_BUILD_TYPE=Release .. && \
-    make && make install && \
-    rm -rf /tmp/Bento4
+# 5. Add /app to PYTHONPATH so imports like 'from main import ...' always work
+ENV PYTHONPATH="/app"
 
-# Python dependencies
-RUN pip install --upgrade pip \
- && pip install -r requirements.txt
+# 6. Expose a port (optional, for health checks)
+EXPOSE 8080
 
-# Entrypoint – run your handlers/tg.py file
-CMD ["python3","-u","handlers/tg.py"]
+# 7. Run your main file when container starts
+CMD ["pyt]()
