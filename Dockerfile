@@ -1,20 +1,24 @@
-# 1. Lightweight Python base image
+# बेस इमेज (स्लिम और सिक्योर)
 FROM python:3.10-slim
 
-# 2. Set working directory inside container
+# Env variables (python cache disable + path)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+# वर्किंग डायरेक्टरी बनाओ
 WORKDIR /app
 
-# 3. Copy all project files into container
-COPY . /app
+# non-root user बनाओ (सिक्योरिटी के लिये)
+RUN adduser --disabled-password --gecos '' botuser
+USER botuser
 
-# 4. Install dependencies
+# पहले requirements.txt कॉपी करो और install करो
+COPY --chown=botuser:botuser requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Add /app to PYTHONPATH so imports like 'from main import ...' always work
-ENV PYTHONPATH="/app"
+# बाकी सारे कोड कॉपी करो
+COPY --chown=botuser:botuser . /app/
 
-# 6. Expose a port (optional, for health checks)
-EXPOSE 8080
-
-# 7. Run your main file when container starts
-CMD ["pyt]()
+# Container start होने पर main.py run होगा
+CMD ["python3", "main.py"]
